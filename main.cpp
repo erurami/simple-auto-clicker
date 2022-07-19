@@ -15,6 +15,15 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 #include "resource.h"
 
+
+#define SUBCLICKERKEY_COUNT 3
+
+UINT g_SubClickerKeys[SUBCLICKERKEY_COUNT] = {
+    VK_SHIFT,
+    VK_CONTROL,
+    VK_MENU
+};
+
 class MainWindow
 {
     public:
@@ -38,7 +47,8 @@ class MainWindow
         int m_interval_ms;
         bool m_clickerActive;
 
-        UINT m_ClickerKey = VK_RBUTTON;
+        int m_cClickerKeys;
+        LPUINT m_lpClickerKeys = NULL;
 
     private:
 
@@ -54,6 +64,7 @@ class MainWindow
         HWND m_hwndButtonEnd;
 
         HWND m_hwndDropDownClickerKey;
+        HWND m_hwndDropDownClickerKeySub;
 
         HWND m_hwndEditInterval;
         HWND m_hwndUpdownInterval;
@@ -196,9 +207,10 @@ void click(int button = 0)
     SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
 }
 
-#define IDC_RUN  1
-#define IDC_STOP 2
-#define IDC_CLICKERKEY 3
+#define IDC_RUN           1
+#define IDC_STOP          2
+#define IDC_CLICKERKEY    3
+#define IDC_CLICKERKEYSUB 4
 
 LRESULT MainWindow::HandleMessage(
         UINT uMsg,
@@ -224,6 +236,18 @@ LRESULT MainWindow::HandleMessage(
 }
 
 
+bool isAllKeyPressed(
+        MainWindow* lpMainWindow)
+{
+    for (int i = 0; i < (lpMainWindow->m_cClickerKeys); i++)
+    {
+        if (GetAsyncKeyState(lpMainWindow->m_lpClickerKeys[i]) >= 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 DWORD WINAPI MainWindow::ClickerThreadProc(
         LPVOID lpParameter)
@@ -232,7 +256,7 @@ DWORD WINAPI MainWindow::ClickerThreadProc(
     MainWindow* lpHostWindow = (MainWindow*)lpParameter;
     while (lpHostWindow->m_clickerActive)
     {
-        if (GetAsyncKeyState(lpHostWindow->m_ClickerKey) < 0)
+        if (isAllKeyPressed(lpHostWindow))
         {
             click();
         }
@@ -272,6 +296,13 @@ int MainWindow::OnCreate(
             m_hwnd, (HMENU)IDC_CLICKERKEY, m_hInstance, NULL
             );
 
+    m_hwndDropDownClickerKeySub = CreateWindow(
+            TEXT("COMBOBOX"), NULL,
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | CBS_DROPDOWNLIST,
+            10, 90, 200, 200,
+            m_hwnd, (HMENU)IDC_CLICKERKEYSUB, m_hInstance, NULL
+            );
+
 
     INITCOMMONCONTROLSEX icce;
     icce.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -287,7 +318,7 @@ int MainWindow::OnCreate(
                               WC_EDIT, NULL,
                               WS_CHILDWINDOW | WS_VISIBLE | WS_BORDER
                               | ES_NUMBER | ES_LEFT,
-                              10, 100, 100, 21,
+                              10, 130, 100, 21,
                               m_hwnd, NULL, m_hInstance, NULL
                               );
 
@@ -309,7 +340,12 @@ int MainWindow::OnCreate(
         SendMessage(m_hwndDropDownClickerKey, CB_ADDSTRING, 0, (LPARAM)m_ClickerKeyDescriptions[i]);
     }
 
-    SendMessage(m_hwndDropDownClickerKey, CB_SETCURSEL, 0, 0);
+    SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("Shift key"));
+    SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("Ctrl key"));
+    SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("Alt key"));
+
+    SendMessage(m_hwndDropDownClickerKey   , CB_SETCURSEL, 1, 0);
+    SendMessage(m_hwndDropDownClickerKeySub, CB_SETCURSEL, 1, 0);
 
 
     m_hFontText = CreateFont(
@@ -318,14 +354,21 @@ int MainWindow::OnCreate(
             CLIP_DEFAULT_PRECIS, PROOF_QUALITY,
             VARIABLE_PITCH | FF_MODERN, TEXT("Segoe UI"));
 
-    SendMessage(m_hwndButtonStart       , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
-    SendMessage(m_hwndButtonEnd         , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
-    SendMessage(m_hwndDropDownClickerKey, WM_SETFONT, (WPARAM)m_hFontText, TRUE);
-    SendMessage(m_hwndEditInterval      , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
+    SendMessage(m_hwndButtonStart          , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
+    SendMessage(m_hwndButtonEnd            , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
+    SendMessage(m_hwndDropDownClickerKey   , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
+    SendMessage(m_hwndDropDownClickerKeySub, WM_SETFONT, (WPARAM)m_hFontText, TRUE);
+    SendMessage(m_hwndEditInterval         , WM_SETFONT, (WPARAM)m_hFontText, TRUE);
 
 
 
     m_interval_ms = (int)SendMessage(m_hwndUpdownInterval, UDM_GETPOS, 0, 0);
+
+
+    m_cClickerKeys = 2;
+    m_lpClickerKeys = new UINT [m_cClickerKeys];
+    m_lpClickerKeys[0] = VK_RBUTTON;
+    m_lpClickerKeys[1] = VK_CONTROL;
 
 
     EnableWindow(m_hwndButtonEnd, FALSE);
@@ -350,27 +393,36 @@ int MainWindow::OnCommand(
                     0,
                     NULL
                     );
-            EnableWindow(m_hwndButtonStart       , FALSE);
-            EnableWindow(m_hwndDropDownClickerKey, FALSE);
-            EnableWindow(m_hwndEditInterval      , FALSE);
-            EnableWindow(m_hwndDropDownClickerKey, FALSE);
-            EnableWindow(m_hwndButtonEnd         , TRUE);
+            EnableWindow(m_hwndButtonStart          , FALSE);
+            EnableWindow(m_hwndEditInterval         , FALSE);
+            EnableWindow(m_hwndDropDownClickerKey   , FALSE);
+            EnableWindow(m_hwndDropDownClickerKeySub, FALSE);
+            EnableWindow(m_hwndButtonEnd            , TRUE);
             break;
 
         case IDC_STOP:
             m_clickerActive = false;
-            EnableWindow(m_hwndButtonStart       , TRUE);
-            EnableWindow(m_hwndDropDownClickerKey, TRUE);
-            EnableWindow(m_hwndEditInterval      , TRUE);
-            EnableWindow(m_hwndDropDownClickerKey, TRUE);
-            EnableWindow(m_hwndButtonEnd         , FALSE);
+            EnableWindow(m_hwndButtonStart          , TRUE);
+            EnableWindow(m_hwndEditInterval         , TRUE);
+            EnableWindow(m_hwndDropDownClickerKey   , TRUE);
+            EnableWindow(m_hwndDropDownClickerKeySub, TRUE);
+            EnableWindow(m_hwndButtonEnd            , FALSE);
             break;
 
         case IDC_CLICKERKEY:
             switch (notificationCode)
             {
                 case CBN_SELCHANGE:
-                    m_ClickerKey = g_ClickerKeys[SendMessage(m_hwndDropDownClickerKey, CB_GETCURSEL, 0, 0)];
+                    m_lpClickerKeys[0] = g_ClickerKeys[SendMessage(m_hwndDropDownClickerKey, CB_GETCURSEL, 0, 0)];
+                    break;
+            }
+            break;
+
+        case IDC_CLICKERKEYSUB:
+            switch (notificationCode)
+            {
+                case CBN_SELCHANGE:
+                    m_lpClickerKeys[1] = g_SubClickerKeys[SendMessage(m_hwndDropDownClickerKeySub, CB_GETCURSEL, 0, 0)];
                     break;
             }
             break;
