@@ -16,9 +16,10 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #include "resource.h"
 
 
-#define SUBCLICKERKEY_COUNT 3
+#define SUBCLICKERKEY_COUNT 4
 
 UINT g_SubClickerKeys[SUBCLICKERKEY_COUNT] = {
+    0x00,
     VK_SHIFT,
     VK_CONTROL,
     VK_MENU
@@ -241,7 +242,8 @@ bool isAllKeyPressed(
 {
     for (int i = 0; i < (lpMainWindow->m_cClickerKeys); i++)
     {
-        if (GetAsyncKeyState(lpMainWindow->m_lpClickerKeys[i]) >= 0)
+        if (GetAsyncKeyState(lpMainWindow->m_lpClickerKeys[i]) >= 0 &&
+            (lpMainWindow->m_lpClickerKeys[i] != 0x00))
         {
             return false;
         }
@@ -340,6 +342,7 @@ int MainWindow::OnCreate(
         SendMessage(m_hwndDropDownClickerKey, CB_ADDSTRING, 0, (LPARAM)m_ClickerKeyDescriptions[i]);
     }
 
+    SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("don't use"));
     SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("Shift key"));
     SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("Ctrl key"));
     SendMessage(m_hwndDropDownClickerKeySub, CB_ADDSTRING, 0, (LPARAM)TEXT("Alt key"));
